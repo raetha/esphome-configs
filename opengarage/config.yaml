@@ -1,0 +1,375 @@
+## Based on https://github.com/gabe565/esphome-configs/tree/main/opengarage
+##
+substitutions:
+  # For Home Assistant entity_id, hostname, etc.
+  device_name: opengarage
+  # Pretty name to show for entities in Home Assistant
+  device_friendly_name: OpenGarage
+  # Area name to use in Home Assistant
+  area_name: Garage
+
+  # Set wifi_use_address to the node IP and uncomment in wifi section if changing the node name
+  wifi_use_address: 0.0.0.0
+
+  # Secrets required for deployment:
+  # api_encryption_key
+  # ota_password
+  # wifi_ssid
+  # wifi_password
+  # wifi_domain
+
+  # Length of time in ms that the relay should stay active.
+  # Some garage doors need the relay to stay active for longer.
+  # Longer values can slow down when button presses respond.
+  # For example, if you open the door, then quickly try to stop/close it,
+  # Entered in milliseconds.
+  relay_click_time: '500'
+
+  # Height at which the door is considered open.
+  # Should be slightly larger than the distance from the ceiling to the door.
+  # Must be lower than the car threshold.
+  # Entered in cm. 
+  door_threshold: '50'
+
+  # Height at which the car is considered to be home.
+  # Should be slightly larger than the distance from the ceiling to the top of the car.
+  # Must be higher than the door threshold.
+  # Entered in cm.
+  car_threshold: '150'
+
+  # Length of time it takes for the door to open / close.
+  # This is used to set the Opening/Closing states correctly
+  # Entered in seconds.
+  open_delay: '22'
+  close_delay: '15'
+
+  # Length of time between distance sensor updates.
+  # Lower values will detect changes more quickly, but could result in increased noise.
+  distance_update_interval: 1000ms
+  # Length of time to leave the pulse pin active
+  distance_pulse_time: 20us
+
+  # SR04 sensors can be noisy. The median is taken to prevent noisy data.
+  # Higher values will slow down the distance sensor's responsiveness,
+  # but will result in more consistent data.
+  # See https://esphome.io/components/sensor/index.html#median
+  distance_median_window_size: '31'
+  # When the first value should be sent. Must be lower than the distance_median_window_size.
+  distance_median_send_first_at: '5'
+
+  # Sound the alarm on open/close
+  # RTTL format references:
+  #  - https://esphome.io/components/rtttl.html?highlight=rtttl#common-beeps
+  #  - https://en.wikipedia.org/wiki/Ring_Tone_Transfer_Language
+  open_alarm: 'true'
+  open_alarm_rtttl: 'two_short:d=4,o=6,b=100:c,p,c'
+  # open_alarm_rtttl: 'long:d=1,o=6,b=100:c'
+  # open_alarm_rtttl: 'open_pulse:d=16,o=5,b=100:c,c6,p.,c,c6,p.,c,c6,p.'
+  # open_alarm_rtttl: 'open_slide:d=128,o=5,b=100:c,d,e,g,4c6.,4p,c,d,e,g,4c6.,4p'
+
+  close_alarm: 'true'
+  close_alarm_rtttl: 'two_short:d=4,o=5,b=100:c,p,c'
+  # close_alarm_rtttl: 'long:d=1,o=5,b=100:c'
+  # close_alarm_rtttl: 'close_pulse:d=16,o=5,b=100:c6,c,p.,c6,c,p.,c6,c,p.'
+  # close_alarm_rtttl: 'close_slide:d=128,o=5,b=100:c6,g,e,d,4c.,4p,c6,g,e,d,4c.,4p'
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${device_friendly_name}
+  area: ${area_name}
+
+esp8266:
+  board: esp01_1m
+  restore_from_flash: true
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  services:
+    - service: play_rtttl
+      variables:
+        song_str: string
+      then:
+        rtttl.play:
+          rtttl: !lambda 'return song_str;'
+  encryption:
+    key: !secret api_encryption_key
+
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  #use_address: ${wifi_use_address}
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  domain: !secret wifi_domain
+  fast_connect: true
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: ${device_name}
+    password: "opengarage"
+
+captive_portal:
+
+sensor:
+  - platform: wifi_signal
+    name: RSSI
+    update_interval: 5min
+    filters:
+      - median:
+          window_size: 5
+  # Distance sensor
+  - platform: ultrasonic
+    trigger_pin: GPIO12
+    echo_pin: GPIO14
+    name: Distance
+    id: distance
+    update_interval: ${distance_update_interval}
+    unit_of_measurement: cm
+    pulse_time: ${distance_pulse_time}
+    timeout: 5m
+    filters:
+      # Sets the value to the max if the sensor times out
+      - lambda: 'return isnan(x) ? 5 : x;'
+      # Take median of the last 5 values
+      - median:
+          window_size: ${distance_median_window_size}
+          send_first_at: ${distance_median_send_first_at}
+      # Convert m to cm
+      - multiply: 100
+      - delta: 1
+
+binary_sensor:
+  - platform: status
+    name: Status
+  # Physical button
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+    id: physical_button
+    on_press:
+      switch.turn_on: relay
+
+  # Vehicle presence
+  - platform: template
+    name: Vehicle
+    device_class: presence
+    lambda: |-
+      if (id(car_threshold).state < id(distance).state) {
+        return false;
+      }
+      if (id(door_threshold).state < id(distance).state) {
+        return true;
+      }
+      return {};
+
+cover:
+  # Main cover
+  - platform: template
+    name: Cover
+    id: opengarage_cover
+    device_class: garage
+    lambda: 'return id(distance).state <= id(door_threshold).state ? COVER_OPEN : COVER_CLOSED;'
+    open_action:
+      script.execute: open_door
+    close_action:
+      script.execute: close_door
+    stop_action:
+      script.execute: stop_door
+
+script:
+  - id: open_door
+    then:
+      if:
+        condition:
+          lambda: 'return id(opengarage_cover).position == COVER_CLOSED;'
+        then:
+          - if:
+              condition:
+                lambda: 'return id(open_alarm).state;'
+              then:
+                - rtttl.play:
+                    rtttl: ${open_alarm_rtttl}
+                - wait_until:
+                    not: rtttl.is_playing
+                - delay: 5s # TODO Turn into setting
+          - switch.turn_on: relay
+          - cover.template.publish:
+              id: opengarage_cover
+              current_operation: OPENING
+          - delay: !lambda "return 1000 * id(open_delay).state;"
+          - cover.template.publish:
+              id: opengarage_cover
+              current_operation: IDLE
+  - id: close_door
+    then:
+      if:
+        condition:
+          lambda: 'return id(opengarage_cover).position == COVER_OPEN;'
+        then:
+          - if:
+              condition:
+                lambda: 'return id(close_alarm).state;'
+              then:
+                - rtttl.play:
+                    rtttl: ${close_alarm_rtttl}
+                - wait_until:
+                    not: rtttl.is_playing
+                - delay: 5s # TODO Turn into setting
+          - switch.turn_on: relay
+          - cover.template.publish:
+              id: opengarage_cover
+              current_operation: CLOSING
+          - delay: !lambda "return 1000 * id(close_delay).state;"
+          - cover.template.publish:
+              id: opengarage_cover
+              current_operation: IDLE
+  - id: stop_door
+    then:
+      if:
+        condition:
+          or:
+            - lambda: 'return id(opengarage_cover).current_operation == COVER_OPERATION_OPENING;'
+            - lambda: 'return id(opengarage_cover).current_operation == COVER_OPERATION_CLOSING;'
+        then:
+          - switch.turn_on: relay
+          - cover.template.publish:
+              id: opengarage_cover
+              current_operation: IDLE
+
+button:
+  - platform: restart
+    name: Restart
+  # Frontend button
+  - platform: template
+    name: Button
+    disabled_by_default: true
+    on_press:
+      switch.turn_on: relay
+
+status_led:
+  pin:
+    number: GPIO2
+    inverted: true
+
+switch:
+  # Relay
+  - platform: gpio
+    pin: GPIO15
+    id: relay
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      # Only pulse on for relay_click_time
+      - delay: !lambda "return id(relay_click_time).state;"
+      - switch.turn_off: relay
+
+  # Open alarm config
+  - platform: template
+    name: Open Alarm
+    id: open_alarm
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
+    icon: mdi:alarm-bell
+
+  # Close alarm config
+  - platform: template
+    name: Close Alarm
+    id: close_alarm
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
+    icon: mdi:alarm-bell
+
+output:
+  # Buzzer
+  - platform: esp8266_pwm
+    pin: GPIO13
+    id: buzzer_pwm
+
+rtttl:
+  output: buzzer_pwm
+
+number:
+  # Door threshold config
+  - platform: template
+    name: Door Threshold
+    id: door_threshold
+    min_value: 0
+    max_value: 500
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: ${door_threshold}
+    entity_category: config
+    mode: box
+    device_class: distance
+    unit_of_measurement: cm
+    icon: mdi:garage
+
+  # Car threshold config
+  - platform: template
+    name: Car Threshold
+    id: car_threshold
+    min_value: 0
+    max_value: 500
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: ${car_threshold}
+    entity_category: config
+    mode: box
+    device_class: distance
+    unit_of_measurement: cm
+    icon: mdi:car
+
+  # Relay click time config
+  - platform: template
+    name: Relay Click Time
+    id: relay_click_time
+    min_value: 100
+    max_value: 2000
+    step: 10
+    optimistic: true
+    restore_value: true
+    initial_value: ${relay_click_time}
+    entity_category: config
+    mode: box
+    unit_of_measurement: ms
+    icon: mdi:timer
+
+  # Open delay config
+  - platform: template
+    name: Door Open Delay
+    id: open_delay
+    min_value: 5
+    max_value: 60
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: ${open_delay}
+    entity_category: config
+    mode: box
+    unit_of_measurement: s
+    icon: mdi:timer
+
+  # Close delay config
+  - platform: template
+    name: Door Close Delay
+    id: close_delay
+    min_value: 5
+    max_value: 60
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: ${close_delay}
+    entity_category: config
+    mode: box
+    unit_of_measurement: s
+    icon: mdi:timer
