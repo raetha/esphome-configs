@@ -24,6 +24,9 @@ substitutions:
   ### The "wifi:" line should be commented out after confirmed new name is working
   wifi_use_address: 0.0.0.0
 
+  ### Models available: alexa, hey_jarvis, okay_nabu, hey_mycroft
+  micro_wake_word_model: okay_nabu
+
   ###  Days and months - Change the values on the right to match your locale ###
   sun: Sunday
   mon: Monday
@@ -63,15 +66,14 @@ esphome:
     priority: 600
     then:
       - script.execute: set_default_backlight_brightness
+      - delay: 5s
+      - lvgl.widget.hide: boot_screen_obj
       - lvgl.label.update:
           id: home_page_time_remaining_label
           text: "No Timers"
-      - delay: 5s
-      - lvgl.widget.hide: boot_screen_obj
       - lambda: id(lvgl_change_page_script)->execute("home_page");
-
   project:
-    name: "Raetha.S3Box3"
+    name: "Raetha.S3Box3 Assistant"
     version: "2025.03.01"
 
 esp32:
@@ -83,6 +85,11 @@ esp32:
       CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
       CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+
+external_components:
+  # TODO - Needed with ESPHome 2025.3.0 until PR 8444 is accepted
+  - source: github://pr#8444
+    components: [lvgl]
 
 psram:
   mode: octal
@@ -97,10 +104,14 @@ api:
           - script.execute: set_default_backlight_brightness
           - lvgl.label.update:
               id: api_info_page_client_info_label
-              text: !lambda return client_info.c_str();
+              text:
+                format: "Client: %s"
+                args: ['client_info.c_str()']
           - lvgl.label.update:
               id: api_info_page_client_address_label
-              text: !lambda return client_address.c_str();
+              text:
+                format: "Client IP: %s"
+                args: ['client_address.c_str()']
           - lvgl.widget.show: api_info_page_client_address_label
           - lvgl.label.update:
               id: api_button_label
@@ -113,7 +124,7 @@ api:
           - script.execute: set_default_backlight_brightness
           - lvgl.label.update:
               id: api_info_page_client_info_label
-              text: "Home Assistant Not Connected"
+              text: "Client Not Connected"
           - lvgl.widget.hide: api_info_page_client_address_label
           - lvgl.label.update:
               id: api_button_label
@@ -140,52 +151,49 @@ logger:
     component: ERROR
 
 wifi:
-  # TODO - disable through fast_connect for BLE improv, uncomment ble lines
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  domain: !secret wifi_domain
   # use_address: ${wifi_use_address}
-  fast_connect: true
+  # TODO - disable through fast_connect for BLE improv, uncomment ble lines
+  #ssid: !secret wifi_ssid
+  #password: !secret wifi_password
+  #domain: !secret wifi_domain
+  #fast_connect: true
   enable_btm: true
   enable_rrm: true
   # TODO - disable ap for BLE improv
-  ap:
-    ssid: ${name}
-    password: s3box123
+  #ap:
+  #  ssid: ${name}
+  #  password: s3box123
   on_connect:
+    # TODO - Uncomment for BLE improv
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
     - lambda: id(wifi_connection) = true;
     - script.execute: set_default_backlight_brightness
     - lvgl.label.update:
         id: wifi_button_label
         text_color: my_green
-    # TODO - Uncomment for BLE improv
-    #- delay: 5s  # Gives time for improv results to be transmitted
-    #- ble.disable:
   on_disconnect:
+    # TODO - Uncomment for BLE improv
+    - ble.enable:
     - lambda: id(wifi_connection) = false;
     - script.execute: set_default_backlight_brightness
     - lvgl.label.update:
         id: wifi_button_label
         text_color: my_red
-    # TODO - Uncomment for BLE improv
-    #- ble.enable:
 
 # TODO - disable captive_portal for BLE improv
-captive_portal:      
+#captive_portal:      
 
 # TODO - enable for BLE improv
+improv_serial:
+
+# TODO - enable for BLE improv, may not be needed for improv
 #esp32_ble:
 #  name: raetha-s3box3
 
 # TODO - enable for BLE improv
-#esp32_improv:
-#  authorizer: none
-#  on_start:
-#    - lambda: id(lvgl_change_page_script)->execute("home_page");
-#  on_provisioned:
-#    - lambda: id(lvgl_change_page_script)->execute("home_page");
-#  on_stop:
-#    - lambda: id(lvgl_change_page_script)->execute("home_page");
+esp32_improv:
+  authorizer: none
 
 spi:
   - id: spi_bus
@@ -194,22 +202,22 @@ spi:
 
 i2c:
   - id: bus_a
-    sda: GPIO08
     scl: GPIO18
+    sda: GPIO8
     scan: true
-    sda_pullup_enabled: true
     scl_pullup_enabled: true
+    sda_pullup_enabled: true
     frequency: 100kHz
   - id: bus_b
-    sda: GPIO41
     scl: GPIO40
+    sda: GPIO41
     scan: true
-    sda_pullup_enabled: true
     scl_pullup_enabled: true
+    sda_pullup_enabled: true
     frequency: 50kHz
 
 output:
-  - id: ledc_output
+  - id: backlight_output
     platform: ledc
     pin: GPIO47
 
@@ -344,15 +352,7 @@ media_player:
 micro_wake_word:
   vad:
   models:
-    - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
-    #  id: okay_nabu
-    #- model: hey_jarvis
-    #  id: hey_jarvis
-    #- model: hey_mycroft
-    #  id: hey_mycroft
-    #- model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
-    #  id: stop
-    #  internal: true
+    - model: ${micro_wake_word_model}
   on_wake_word_detected:
     # TODO - Attempt to restore playing audio
     #- if:
@@ -362,7 +362,7 @@ micro_wake_word:
     #      - media_player.pause
     - if:
         condition:
-          - switch.is_on: wake_sound_enabled_switch
+          - switch.is_on: play_wake_sound_switch
         then:
           - media_player.speaker.play_on_device_media_file:
               media_file: wake_word_triggered_sound
@@ -390,35 +390,14 @@ voice_assistant:
             - lvgl.page.is_showing: assist_replying_page
         then:
           - lambda: id(lvgl_change_page_script)->execute("home_page");
-          # - lambda: id(lvgl_change_page_script)->execute("home_page");
   on_listening:
     - lambda: id(lvgl_change_page_script)->execute("assist_listening_page");
-    # - lvgl.widget.hide: header_obj
-    # - lvgl.page.show: assist_listening_page
-    # - if:
-    #     condition:
-    #       lambda: return id(show_conversation_switch);
-    #     then:
-    #       - lambda: id(lvgl_header_popup_script)->execute("...");
   on_stt_end:
     - lambda: id(lvgl_change_page_script)->execute("assist_thinking_page");
-    - lambda: id(lvgl_header_popup_script)->execute(x);
-    # - lvgl.page.show: assist_thinking_page
-    # - if:
-    #     condition:
-    #       lambda: return id(show_conversation_switch);
-    #     then:
-    #       - lambda: id(lvgl_header_popup_script)->execute(x);
-    #       - lambda: id(lvgl_footer_popup_script)->execute("...");
+    - lambda: id(update_header_popup_script)->execute(x);
   on_tts_start:
     - lambda: id(lvgl_change_page_script)->execute("assist_replying_page");
-    - lambda: id(lvgl_footer_popup_script)->execute(x);
-    # - lvgl.page.show: assist_replying_page
-    # - if:
-    #     condition:
-    #       lambda: return id(show_conversation_switch);
-    #     then:
-    #       - lambda: id(lvgl_footer_popup_script)->execute(x);
+    - lambda: id(update_footer_popup_script)->execute(x);
   on_tts_end:
     - if:
         condition:
@@ -426,7 +405,6 @@ voice_assistant:
         then:
           - delay: 10s
           - lambda: id(lvgl_change_page_script)->execute("home_page");
-          # - lambda: id(lvgl_change_page_script)->execute("home_page");
   on_error:
     - if:
         condition:
@@ -434,10 +412,8 @@ voice_assistant:
             - voice_assistant.is_running
         then:
           - lambda: id(lvgl_change_page_script)->execute("assist_error_page");
-          - lambda: id(lvgl_header_popup_script)->execute(code);
-          - lambda: id(lvgl_footer_popup_script)->execute(message);
-          # - lvgl.widget.hide: header_obj
-          # - lvgl.page.show: assist_error_page
+          - lambda: id(update_header_popup_script)->execute(code);
+          - lambda: id(update_footer_popup_script)->execute(message);
   on_idle:
     - if:
         condition:
@@ -445,7 +421,6 @@ voice_assistant:
             - lvgl.page.is_showing: home_page
         then:
           - lambda: id(lvgl_change_page_script)->execute("home_page");
-          # - lambda: id(lvgl_change_page_script)->execute("home_page");
   on_end:
     - if:
         condition:
@@ -465,9 +440,8 @@ voice_assistant:
     #      - media_player.play
   on_client_connected:
     # TODO - enable for BLE improv
-    #- wait_until:
-    #    not: ble.enabled
-    #- delay: 2s
+    - wait_until:
+        not: ble.enabled
     - if:
         condition:
           and:
@@ -481,7 +455,6 @@ voice_assistant:
     - lvgl.label.update:
         id: home_page_time_remaining_label
         text: "No Timers"
-    # - lambda: id(time_remaining_text).publish_state ("0:00:00"); 
   #on_timer_updated:
   on_timer_tick:
     - lvgl.label.update:
@@ -492,11 +465,6 @@ voice_assistant:
           } else {
             return str_sprintf("%d:%02d:%02d", (timers[0].seconds_left / 3600), ((timers[0].seconds_left % 3600) / 60), (timers[0].seconds_left % 60));
           }
-        #   //int seconds = timers[0].seconds_left;
-        #   //int hours = seconds / 3600;
-        #   //int minutes = (seconds % 3600) / 60;
-        #   //seconds %= 60;
-        #   //id(time_remaining_text).publish_state(str_sprintf("%d:%02d:%02d", hours, minutes, seconds)); 
     - if:
         condition:
           lambda: return (timers[0].seconds_left <= 30);
@@ -505,8 +473,6 @@ voice_assistant:
   on_timer_finished:
     - switch.turn_on: timer_ringing_switch
     - lambda: id(lvgl_change_page_script)->execute("assist_timer_finished_page");
-    # - lvgl.widget.hide: [header_obj, center_popup_obj]
-    # - lvgl.page.show: assist_timer_finished_page
 
 script:
   # TODO - More scripts to pull common functions out of other areas, and allow for easier changes
@@ -517,11 +483,6 @@ script:
             lambda: return (int(id(backlight_light).current_values.get_brightness() * 100) != int(id(brightness_percent).state));
           then:
             - lambda: id(backlight_light).turn_on().set_brightness(id(brightness_percent).state /100).perform();
-      # - logger.log:
-      #     format: "Current: %d, Expected: %d"
-      #     args:
-      #       - 'int(id(backlight_light).current_values.get_brightness() * 100)'
-      #       - 'int(id(brightness_percent).state)'
   - id: set_idle_backlight_brightness
     then:
       - if:
@@ -544,7 +505,7 @@ script:
             else {
               return text_value;
             }
-  - id: lvgl_header_popup_script
+  - id: update_header_popup_script
     mode: queued
     parameters:
       text_value: string
@@ -558,8 +519,7 @@ script:
             else {
               return text_value;
             }
-      # - lvgl.widget.show: header_popup_obj
-  - id: lvgl_footer_popup_script
+  - id: update_footer_popup_script
     mode: queued
     parameters:
       text_value: string
@@ -573,7 +533,6 @@ script:
             else {
               return text_value;
             }
-      # - lvgl.widget.show: footer_popup_obj
   - id: lvgl_update_date_script
     then:
       - lvgl.label.update:
@@ -611,14 +570,16 @@ script:
           then:
             - lvgl.page.show: home_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lambda: id(update_header_popup_script)->execute("");
+            - lambda: id(update_footer_popup_script)->execute("");
             - script.stop: lvgl_change_page_script
       - if: # clock_page
           condition:
             lambda: return page_name == "clock_page";
           then:
             - lvgl.page.show: clock_page
-            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - lambda: id(backlight_light).turn_on().set_brightness(id(clock_brightness_percent).state /100).perform();
             - script.stop: lvgl_change_page_script
       - if: # ota_page
@@ -628,7 +589,7 @@ script:
             - lambda: id(backlight_light).turn_on().set_brightness(1.0).set_transition_length(0).perform();
                       id(backlight_light).loop();
             - lvgl.page.show: ota_page
-            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       - if: # api_info_page
           condition:
@@ -636,7 +597,7 @@ script:
           then:
             - lvgl.page.show: api_info_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       - if: # wifi_info_page
           condition:
@@ -644,7 +605,7 @@ script:
           then:
             - lvgl.page.show: wifi_info_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       - if: # settings_page
           condition:
@@ -652,7 +613,7 @@ script:
           then:
             - lvgl.page.show: settings_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       - if: # assist_listening_page
           condition:
@@ -664,9 +625,9 @@ script:
                   lambda: return id(show_conversation_switch);
                 then:
                   - lvgl.widget.show: [header_popup_obj]
-                  - lvgl.widget.hide: [header_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+                  - lvgl.widget.hide: [header_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
                 else:
-                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       - if: # assist_thinking_page
           condition:
@@ -678,9 +639,9 @@ script:
                   lambda: return id(show_conversation_switch);
                 then:
                   - lvgl.widget.show: [header_popup_obj, footer_popup_obj]
-                  - lvgl.widget.hide: [header_obj, center_popup_obj, footer_navigation_btnmtrx]
+                  - lvgl.widget.hide: [header_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
                 else:
-                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       - if: # assist_replying_page
           condition:
@@ -692,9 +653,9 @@ script:
                   lambda: return id(show_conversation_switch);
                 then:
                   - lvgl.widget.show: [header_popup_obj, footer_popup_obj]
-                  - lvgl.widget.hide: [header_obj, center_popup_obj, footer_navigation_btnmtrx]
+                  - lvgl.widget.hide: [header_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
                 else:
-                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       - if: # assist_error_page
           condition:
@@ -702,14 +663,14 @@ script:
           then:
             - lvgl.page.show: assist_error_page
             - lvgl.widget.show: [header_popup_obj, footer_popup_obj]
-            - lvgl.widget.hide: [header_obj, center_popup_obj, footer_navigation_btnmtrx]
+            - lvgl.widget.hide: [header_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       - if: # assist_timer_finished_page
           condition:
             lambda: return page_name == "assist_timer_finished_page";
           then:
             - lvgl.page.show: assist_timer_finished_page
-            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       - if: # guest_wifi_qrcode_page
           condition:
@@ -717,10 +678,10 @@ script:
           then:
             - lvgl.page.show: guest_wifi_qrcode_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       # Show home page if no match above
-      - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
+      - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
       - lvgl.widget.show: [header_obj]
       - lvgl.page.show: home_page
       - script.stop: lvgl_change_page_script
@@ -915,9 +876,9 @@ light:
     name: Backlight
     icon: "mdi:television"
     entity_category: config
-    output: ledc_output
+    output: backlight_output
     restore_mode: ALWAYS_ON
-    default_transition_length: 50ms
+    default_transition_length: 250ms
 
 switch:
   # This is the mic mute switch. It is exposed to Home Assistant. The user can only turn it on and off if the hardware switch is off. (The hardware switch overrides the software one)
@@ -997,23 +958,13 @@ switch:
           id: off_enabled_lvgl_switch
           state:
             checked: true
-      - lvgl.widget.enable: [off_delay_seconds_textarea]
-      # - lvgl.widget.update:
-      #     #id: [off_delay_seconds_minus_button, off_delay_seconds_spinbox, off_delay_seconds_plus_button]
-      #     id: [off_delay_seconds_textarea]
-      #     state:
-      #       disabled: false
+      - lvgl.widget.enable: [off_delay_seconds_textarea, off_delay_seconds_button]
     on_turn_off:
       - lvgl.widget.update:
           id: off_enabled_lvgl_switch
           state:
             checked: false
-      - lvgl.widget.disable: [off_delay_seconds_textarea]
-      # - lvgl.widget.update:
-      #     #id: [off_delay_seconds_minus_button, off_delay_seconds_spinbox, off_delay_seconds_plus_button]
-      #     id: [off_delay_seconds_textarea]
-      #     state:
-      #       disabled: true
+      - lvgl.widget.disable: [off_delay_seconds_textarea, off_delay_seconds_button]
   - id: clock_enabled_switch
     platform: template
     name: "Idle Enabled"
@@ -1026,36 +977,28 @@ switch:
           id: clock_enabled_lvgl_switch
           state:
             checked: true
-      - lvgl.widget.enable: [clock_delay_seconds_minus_button, clock_delay_seconds_spinbox, clock_delay_seconds_plus_button, clock_brightness_percent_slider]
-      # - lvgl.widget.update:
-      #     id: [clock_delay_seconds_minus_button, clock_delay_seconds_spinbox, clock_delay_seconds_plus_button, clock_brightness_percent_slider]
-      #     state:
-      #       disabled: false
+      - lvgl.widget.enable: [clock_delay_seconds_textarea, clock_delay_seconds_button]
     on_turn_off:
       - lvgl.widget.update:
           id: clock_enabled_lvgl_switch
           state:
             checked: false
-      - lvgl.widget.disable: [clock_delay_seconds_minus_button, clock_delay_seconds_spinbox, clock_delay_seconds_plus_button, clock_brightness_percent_slider]
-      # - lvgl.widget.update:
-      #     id: [clock_delay_seconds_minus_button, clock_delay_seconds_spinbox, clock_delay_seconds_plus_button, clock_brightness_percent_slider]
-      #     state:
-      #       disabled: true
-  - id: wake_sound_enabled_switch
+      - lvgl.widget.disable: [clock_delay_seconds_textarea, clock_delay_seconds_button]
+  - id: play_wake_sound_switch
     platform: template
-    name: "Wake Sound"
+    name: "Play Wake Sound"
     icon: mdi:music
     entity_category: config
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
       - lvgl.widget.update:
-          id: wake_sound_enabled_lvgl_switch
+          id: play_wake_sound_lvgl_switch
           state:
             checked: true
     on_turn_off:
       - lvgl.widget.update:
-          id: wake_sound_enabled_lvgl_switch
+          id: play_wake_sound_lvgl_switch
           state:
             checked: false
   - id: mute_responses_switch
@@ -1190,9 +1133,16 @@ text_sensor:
               text:
                 format: "MAC: %s"
                 args: ["x.c_str()"]
-  # - id: uptime_text
-  #   platform: template
-  # TODO - Possible new uptime sensor in text form, need to add to page
+  - id: version_text_sensor
+    platform: version
+    hide_timestamp: true
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: api_info_page_version_label
+          text:
+            format: "Version: %s"
+            args: ['x.c_str()']
   - id: uptime_text_sensor
     platform: uptime
     internal: true
@@ -1201,7 +1151,7 @@ text_sensor:
           id: api_info_page_uptime_label
           text:
             format: "Uptime: %s"
-            args: ['x']
+            args: ['x.c_str()']
 
 text:
   - id: guest_wifi_qrcode_text
@@ -1271,7 +1221,7 @@ number:
             - script.execute: set_default_backlight_brightness
   - id: clock_brightness_percent
     platform: template
-    name: "Idle Brightness"
+    name: "Idle Clock Brightness"
     icon: 'mdi:sleep'
     entity_category: config
     unit_of_measurement: '%'
@@ -1285,7 +1235,7 @@ number:
       - lvgl.label.update:
           id: clock_brightness_label
           text:
-            format: "Idle Brightness: %.0f%"
+            format: "Clock Brightness: %.0f%"
             args: ['id(clock_brightness_percent).state']
       - lvgl.slider.update:
           id: clock_brightness_percent_slider
@@ -1297,7 +1247,7 @@ number:
             - script.execute: set_idle_backlight_brightness
   - id: clock_delay_seconds
     platform: template
-    name: "Idle Delay"
+    name: "Idle Clock Delay"
     icon: 'mdi:sleep'
     entity_category: config
     unit_of_measurement: 'secs'
@@ -1307,10 +1257,13 @@ number:
     step: 5
     min_value: 10
     max_value: 9999
-    # on_value:
-    #   - lvgl.spinbox.update:
-    #       id: clock_delay_seconds_spinbox
-    #       value: !lambda return x;
+    on_value:
+      - lvgl.textarea.update:
+          id: clock_delay_seconds_textarea
+          text: !lambda return to_string(int(x));
+      - lvgl.label.update:
+          id: clock_delay_seconds_label
+          text: !lambda return to_string(int(x));
   - id: off_delay_seconds
     platform: template
     name: "Off Delay"
@@ -1326,10 +1279,10 @@ number:
     on_value:
       - lvgl.textarea.update:
           id: off_delay_seconds_textarea
-          text: !lambda return to_string(x);
-    #   - lvgl.spinbox.update:
-    #       id: off_delay_seconds_spinbox
-    #       value: !lambda return x;
+          text: !lambda return to_string(int(x));
+      - lvgl.label.update:
+          id: off_delay_seconds_label
+          text: !lambda return to_string(int(x));
 
 sensor:
   - id: wifi_signal_sensor
@@ -1357,19 +1310,6 @@ sensor:
             }
             snprintf(buf, sizeof(buf), "%s", icon.c_str());
             return buf;
-  # TODO - Old uptime sensor to update text_sensor
-  # - id: uptime_sensor
-  #   platform: uptime
-  #   internal: true
-  #   update_interval: 5min
-  #   on_value:
-  #     - lambda: |-
-  #         int seconds = id(uptime_sensor).state;
-  #         int days = seconds / 86400;
-  #         int hours = seconds / 3600;
-  #         int minutes = (seconds % 3600) / 60;
-  #         seconds %= 60;
-  #         id(uptime_text).publish_state(str_sprintf("%03d:%02d:%02d", days, hours, minutes));
 
 binary_sensor:
   ### Hardware mute switch (Top of the device) ###
@@ -1623,6 +1563,8 @@ lvgl:
         height: 50
         width: 50
         align: CENTER
+      textarea:
+        align: CENTER
     msgboxes:
       - id: restart_msgbox
         close_button: false
@@ -1770,8 +1712,6 @@ lvgl:
         - keyboard: # lvgl_keyboard
             id: lvgl_keyboard
             hidden: true
-            #textarea: off_delay_seconds_textarea
-            #mode: number
             on_ready:
               then:
                 - lvgl.widget.hide: lvgl_keyboard
@@ -1810,13 +1750,11 @@ lvgl:
               widgets:
                 - label:
                     id: media_player_state_label
-                    styles: body_child_style
-                    height: 25
+                    pad_top: 10
                     text: "Unknown"
                 - obj:
                     styles: body_child_style
-                    height: 65
-                    bg_color: BLACK
+                    height: 55
                     layout:
                       type: FLEX
                       flex_flow: ROW
@@ -1958,6 +1896,8 @@ lvgl:
                 - label:
                     id: api_info_page_client_address_label
                 - label:
+                    id: api_info_page_version_label
+                - label:
                     id: api_info_page_uptime_label
       - id: wifi_info_page
         skip: true
@@ -1984,13 +1924,16 @@ lvgl:
               widgets:
                 - tabview:
                     styles: body_child_style
+                    #height: 175
                     position: LEFT
                     size: 30
                     tab_style:
                       styles: settings_footer_style
+                      height: 175
                       text_font: mdi_icons_25
                       items:
                         styles: body_child_style
+                        #height: 175
                         border_opa: COVER
                         border_width: 1
                     tabs:
@@ -2032,7 +1975,7 @@ lvgl:
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_EVENLY #CENTER
+                                      flex_align_main: SPACE_BETWEEN #CENTER
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
@@ -2055,11 +1998,15 @@ lvgl:
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_EVENLY
+                                      flex_align_main: SPACE_BETWEEN
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
                                       - button: # Restart
+                                          width: 75
+                                          height: 30
+                                          border_opa: COVER
+                                          border_width: 1
                                           widgets:
                                             - label:
                                                 text: "Restart"
@@ -2068,6 +2015,10 @@ lvgl:
                                             then:
                                               - lvgl.widget.show: restart_msgbox
                                       - button: # Factory Reset
+                                          width: 130
+                                          height: 30
+                                          border_opa: COVER
+                                          border_width: 1
                                           widgets:
                                             - label:
                                                 text: "Factory Reset"
@@ -2094,12 +2045,12 @@ lvgl:
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_EVENLY
+                                      flex_align_main: SPACE_BETWEEN
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
                                       - label:
-                                          text: "Off Enabled:"
+                                          text: "Screen Off Enabled:"
                                       - switch:
                                           id: off_enabled_lvgl_switch
                                           on_value:
@@ -2113,73 +2064,48 @@ lvgl:
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_EVENLY
+                                      flex_align_main: SPACE_BETWEEN
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
                                       - label:
-                                          text: "Off Delay (secs):"
-                                      - textarea:
-                                          id: off_delay_seconds_textarea
-                                          accepted_chars: "0123456789"
-                                          max_length: 4
-                                          one_line: true
-                                          text: 30
-                                          on_focus:
+                                          text: "Delay (secs):"
+                                      - button:
+                                          id: off_delay_seconds_button
+                                          width: 35%
+                                          height: 30
+                                          bg_color: WHITE
+                                          border_opa: COVER
+                                          border_width: 1
+                                          text_color: BLACK
+                                          widgets:
+                                            - label:
+                                                id: off_delay_seconds_label
+                                                text_font: montserrat_18
+                                          on_press:
                                             then:
                                               - lvgl.keyboard.update:
                                                   id: lvgl_keyboard
                                                   mode: number
                                                   textarea: off_delay_seconds_textarea
-                                              - lvgl.widget.show: lvgl_keyboard
+                                              - lambda: id(update_header_popup_script)->execute(to_string(int(id(off_delay_seconds).state)));
+                                              - lvgl.widget.show: [lvgl_keyboard, header_popup_obj]
+                                      - textarea:
+                                          id: off_delay_seconds_textarea
+                                          hidden: true
+                                          width: 35%
+                                          accepted_chars: ".0123456789"
+                                          max_length: 4
+                                          one_line: true
+                                          text: 30
+                                          on_value:
+                                            - lambda: id(update_header_popup_script)->execute(text.c_str());
                                           on_ready:
+                                            - lvgl.widget.hide: [header_popup_obj]
                                             - number.set:
                                                 id: off_delay_seconds
                                                 value: !lambda return atoi(text.c_str());
-                                # - obj:
-                                #     styles: body_child_style
-                                #     height: 30
-                                #     layout:
-                                #       type: FLEX
-                                #       flex_flow: ROW
-                                #       flex_align_main: SPACE_EVENLY
-                                #       flex_align_cross: CENTER
-                                #       flex_align_track: CENTER
-                                #     widgets:
-                                #       - button:
-                                #           id: off_delay_seconds_minus_button
-                                #           height: 25
-                                #           width: 30
-                                #           widgets:
-                                #             - label:
-                                #                 text: "\U000F0375"
-                                #                 text_font: mdi_icons_25
-                                #           on_press:
-                                #             then:
-                                #               - lvgl.spinbox.decrement: off_delay_seconds_spinbox
-                                #       - spinbox:
-                                #           id: off_delay_seconds_spinbox
-                                #           decimal_places: 0
-                                #           digits: 4
-                                #           range_from: 10
-                                #           range_to: 9999
-                                #           step: 5
-                                #           value: 30 # TODO remove once number component sync works
-                                #           on_value:
-                                #             - number.set:
-                                #                 id: off_delay_seconds
-                                #                 value: !lambda return int(x);
-                                #       - button:
-                                #           id: off_delay_seconds_plus_button
-                                #           height: 25
-                                #           width: 30
-                                #           widgets:
-                                #             - label:
-                                #                 text: "\U000F0416"
-                                #                 text_font: mdi_icons_25
-                                #           on_press:
-                                #             then:
-                                #               - lvgl.spinbox.increment: off_delay_seconds_spinbox
+                                            - lambda: id(update_header_popup_script)->execute("");
                       - id: clock_settings_tab # Clock Settings
                         name: "\U000F0954"
                         widgets:
@@ -2199,12 +2125,12 @@ lvgl:
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_EVENLY
+                                      flex_align_main: SPACE_BETWEEN
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
                                       - label:
-                                          text: "Clock Enabled:"
+                                          text: "Idle Clock Enabled:"
                                       - switch:
                                           id: clock_enabled_lvgl_switch
                                           on_value:
@@ -2212,52 +2138,54 @@ lvgl:
                                                 id: clock_enabled_switch
                                                 state: !lambda return x;
                                 # Clock Delay Seconds
-                                - label:
-                                    text: "Clock Delay (seconds):"
                                 - obj:
                                     styles: body_child_style
                                     height: 30
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_EVENLY
+                                      flex_align_main: SPACE_BETWEEN
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
+                                      - label:
+                                          text: "Delay (secs):"
                                       - button:
-                                          id: clock_delay_seconds_minus_button
-                                          height: 25
-                                          width: 30
+                                          id: clock_delay_seconds_button
+                                          width: 35%
+                                          height: 30
+                                          bg_color: WHITE
+                                          border_opa: COVER
+                                          border_width: 1
+                                          text_color: BLACK
                                           widgets:
                                             - label:
-                                                text: "\U000F0375"
-                                                text_font: mdi_icons_25
+                                                id: clock_delay_seconds_label
+                                                text_font: montserrat_18
                                           on_press:
                                             then:
-                                              - lvgl.spinbox.decrement: clock_delay_seconds_spinbox
-                                      - spinbox:
-                                          id: clock_delay_seconds_spinbox
-                                          decimal_places: 0
-                                          digits: 4
-                                          range_from: 10
-                                          range_to: 9999
-                                          step: 5
-                                          value: 30 # TODO remove once number component sync works
+                                              - lvgl.keyboard.update:
+                                                  id: lvgl_keyboard
+                                                  mode: number
+                                                  textarea: clock_delay_seconds_textarea
+                                              - lambda: id(update_header_popup_script)->execute(to_string(int(id(clock_delay_seconds).state)));
+                                              - lvgl.widget.show: [lvgl_keyboard, header_popup_obj]
+                                      - textarea:
+                                          id: clock_delay_seconds_textarea
+                                          hidden: true
+                                          width: 35%
+                                          accepted_chars: ".0123456789"
+                                          max_length: 4
+                                          one_line: true
+                                          text: 30
                                           on_value:
+                                            - lambda: id(update_header_popup_script)->execute(text.c_str());
+                                          on_ready:
+                                            - lvgl.widget.hide: [header_popup_obj]
                                             - number.set:
                                                 id: clock_delay_seconds
-                                                value: !lambda return int(x);
-                                      - button:
-                                          id: clock_delay_seconds_plus_button
-                                          height: 25
-                                          width: 30
-                                          widgets:
-                                            - label:
-                                                text: "\U000F0416"
-                                                text_font: mdi_icons_25
-                                          on_press:
-                                            then:
-                                              - lvgl.spinbox.increment: clock_delay_seconds_spinbox
+                                                value: !lambda return atoi(text.c_str());
+                                            - lambda: id(update_header_popup_script)->execute("");
                                 # Clock Brightness
                                 - label:
                                     id: clock_brightness_label
@@ -2296,17 +2224,17 @@ lvgl:
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_EVENLY
+                                      flex_align_main: SPACE_BETWEEN
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
                                       - label:
-                                          text: "Wake Sound:"
+                                          text: "Play Wake Sound:"
                                       - switch:
-                                          id: wake_sound_enabled_lvgl_switch
+                                          id: play_wake_sound_lvgl_switch
                                           on_value:
                                             - switch.template.publish:
-                                                id: wake_sound_enabled_switch
+                                                id: play_wake_sound_switch
                                                 state: !lambda return x;
                                 # Mute Responses
                                 - obj:
@@ -2315,7 +2243,7 @@ lvgl:
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_EVENLY
+                                      flex_align_main: SPACE_BETWEEN
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
@@ -2334,7 +2262,7 @@ lvgl:
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_EVENLY
+                                      flex_align_main: SPACE_BETWEEN
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
