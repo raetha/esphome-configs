@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+
 ## Based on https://github.com/BigBobbas/ESP32-S3-Box3-Custom-ESPHome
 ##
 ## You can change the name and friendly name before the device is added to Home Assistant.
@@ -16,6 +18,7 @@
 #  - logger.log:
 #        format: "The temperature sensor reports value %.1f and humidity %.1f"
 #        args: [ 'id(temperature_sensor).state', 'id(humidity_sensor).state' ]
+---
 substitutions:
   name: s3box3-satellite
   friendly_name: S3Box3 Satellite
@@ -35,7 +38,7 @@ substitutions:
   thu: Thursday
   fri: Friday
   sat: Saturday
-  
+
   jan: January
   feb: February
   mar: March
@@ -50,14 +53,14 @@ substitutions:
   dec: December
 
   boot_screen_image_url: https://github.com/BigBobbas/ESP32-S3-Box3-Custom-ESPHome/raw/main/images/loading.png
-  #boot_screen_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
+  # boot_screen_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
   listening_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/listening_320_240.png
   thinking_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/thinking_320_240.png
   replying_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/replying_320_240.png
   error_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/error_320_240.png
   timer_finished_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/timer_finished_320_240.png
   ### END OF SUBSTITUTIONS ###
-  
+
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
@@ -153,14 +156,14 @@ logger:
 wifi:
   # use_address: ${wifi_use_address}
   # TODO - disable through fast_connect for BLE improv, uncomment ble lines
-  #ssid: !secret wifi_ssid
-  #password: !secret wifi_password
-  #domain: !secret wifi_domain
-  #fast_connect: true
+  # ssid: !secret wifi_ssid
+  # password: !secret wifi_password
+  # domain: !secret wifi_domain
+  # fast_connect: true
   enable_btm: true
   enable_rrm: true
   # TODO - disable ap for BLE improv
-  #ap:
+  # ap:
   #  ssid: ${name}
   #  password: s3box123
   on_connect:
@@ -182,13 +185,13 @@ wifi:
         text_color: my_red
 
 # TODO - disable captive_portal for BLE improv
-#captive_portal:      
+# captive_portal:
 
 # TODO - enable for BLE improv
 improv_serial:
 
 # TODO - enable for BLE improv, may not be needed for improv
-#esp32_ble:
+# esp32_ble:
 #  name: raetha-s3box3
 
 # TODO - enable for BLE improv
@@ -355,7 +358,7 @@ micro_wake_word:
     - model: ${micro_wake_word_model}
   on_wake_word_detected:
     # TODO - Attempt to restore playing audio
-    #- if:
+    # - if:
     #    condition:
     #      media_player.is_playing:
     #    then:
@@ -368,7 +371,7 @@ micro_wake_word:
               media_file: wake_word_triggered_sound
               announcement: true
           - wait_until:
-            - media_player.is_idle:
+              - media_player.is_idle:
           - delay: 150ms
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
@@ -382,7 +385,7 @@ voice_assistant:
   auto_gain: 31dBFS
   volume_multiplier: 4.0
   on_start:
-    - if: 
+    - if:
         condition:
           or:
             - lvgl.page.is_showing: assist_listening_page
@@ -433,7 +436,7 @@ voice_assistant:
           - delay: 100ms
           - micro_wake_word.start
     # TODO - Attempt to restore playing audio
-    #- if:
+    # - if:
     #    condition:
     #      media_player.is_paused:
     #    then:
@@ -450,12 +453,12 @@ voice_assistant:
           - micro_wake_word.start:
   on_client_disconnected:
     - voice_assistant.stop:
-  #on_timer_started:
+  # on_timer_started:
   on_timer_cancelled:
     - lvgl.label.update:
         id: home_page_time_remaining_label
         text: "No Timers"
-  #on_timer_updated:
+  # on_timer_updated:
   on_timer_tick:
     - lvgl.label.update:
         id: home_page_time_remaining_label
@@ -564,58 +567,58 @@ script:
       page_name: string
     then:
       - script.execute: set_default_backlight_brightness
-      - if: # home_page
+      - if:  # home_page
           condition:
             lambda: return page_name == "home_page";
           then:
             - lvgl.page.show: home_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - lambda: id(update_header_popup_script)->execute("");
             - lambda: id(update_footer_popup_script)->execute("");
             - script.stop: lvgl_change_page_script
-      - if: # clock_page
+      - if:  # clock_page
           condition:
             lambda: return page_name == "clock_page";
           then:
             - lvgl.page.show: clock_page
-            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - lambda: id(backlight_light).turn_on().set_brightness(id(clock_brightness_percent).state /100).perform();
             - script.stop: lvgl_change_page_script
-      - if: # ota_page
+      - if:  # ota_page
           condition:
             lambda: return page_name == "ota_page";
           then:
             - lambda: id(backlight_light).turn_on().set_brightness(1.0).set_transition_length(0).perform();
                       id(backlight_light).loop();
             - lvgl.page.show: ota_page
-            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
-      - if: # api_info_page
+      - if:  # api_info_page
           condition:
             lambda: return page_name == "api_info_page";
           then:
             - lvgl.page.show: api_info_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
-      - if: # wifi_info_page
+      - if:  # wifi_info_page
           condition:
             lambda: return page_name == "wifi_info_page";
           then:
             - lvgl.page.show: wifi_info_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
-      - if: # settings_page
+      - if:  # settings_page
           condition:
             lambda: return page_name == "settings_page";
           then:
             - lvgl.page.show: settings_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
-      - if: # assist_listening_page
+      - if:  # assist_listening_page
           condition:
             lambda: return page_name == "assist_listening_page";
           then:
@@ -625,11 +628,11 @@ script:
                   lambda: return id(show_conversation_switch);
                 then:
                   - lvgl.widget.show: [header_popup_obj]
-                  - lvgl.widget.hide: [header_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+                  - lvgl.widget.hide: [header_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
                 else:
-                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
-      - if: # assist_thinking_page
+      - if:  # assist_thinking_page
           condition:
             lambda: return page_name == "assist_thinking_page";
           then:
@@ -639,11 +642,11 @@ script:
                   lambda: return id(show_conversation_switch);
                 then:
                   - lvgl.widget.show: [header_popup_obj, footer_popup_obj]
-                  - lvgl.widget.hide: [header_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+                  - lvgl.widget.hide: [header_obj, center_popup_obj, lvgl_keyboard]
                 else:
-                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
-      - if: # assist_replying_page
+      - if:  # assist_replying_page
           condition:
             lambda: return page_name == "assist_replying_page";
           then:
@@ -653,35 +656,35 @@ script:
                   lambda: return id(show_conversation_switch);
                 then:
                   - lvgl.widget.show: [header_popup_obj, footer_popup_obj]
-                  - lvgl.widget.hide: [header_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+                  - lvgl.widget.hide: [header_obj, center_popup_obj, lvgl_keyboard]
                 else:
-                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+                  - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
-      - if: # assist_error_page
+      - if:  # assist_error_page
           condition:
             lambda: return page_name == "assist_error_page";
           then:
             - lvgl.page.show: assist_error_page
             - lvgl.widget.show: [header_popup_obj, footer_popup_obj]
-            - lvgl.widget.hide: [header_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lvgl.widget.hide: [header_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
-      - if: # assist_timer_finished_page
+      - if:  # assist_timer_finished_page
           condition:
             lambda: return page_name == "assist_timer_finished_page";
           then:
             - lvgl.page.show: assist_timer_finished_page
-            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lvgl.widget.hide: [header_obj, header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
-      - if: # guest_wifi_qrcode_page
+      - if:  # guest_wifi_qrcode_page
           condition:
             lambda: return page_name == "guest_wifi_qrcode_page";
           then:
             - lvgl.page.show: guest_wifi_qrcode_page
             - lvgl.widget.show: [header_obj]
-            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+            - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
             - script.stop: lvgl_change_page_script
       # Show home page if no match above
-      - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx, lvgl_keyboard]
+      - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, lvgl_keyboard]
       - lvgl.widget.show: [header_obj]
       - lvgl.page.show: home_page
       - script.stop: lvgl_change_page_script
@@ -722,7 +725,7 @@ font:
   # - id: my_font_14
   #   file: "gfonts://Inconsolata"
   #   size: 14
-  #   ##### If extended characters are needed, uncomment and add glyphsets to all gfonts entries #####
+  #   ### If extended characters are needed, uncomment and add glyphsets to all gfonts entries ###
   #   # glyphsets:
   #   #   - GF_Latin_Core
   - id: my_font_16
@@ -755,40 +758,40 @@ font:
     file: "gfonts://Material+Symbols+Outlined"
     size: 45
     glyphs: &google_icons_glyphs
-      - "\U0000e63e" # wifi
-      - "\U0000e4d9" # wifi 2 bar
-      - "\U0000e4ca" # wifi 1 bar
-      - "\U0000f063" # signal wifi bad
+      - "\U0000e63e"  # wifi
+      - "\U0000e4d9"  # wifi 2 bar
+      - "\U0000e4ca"  # wifi 1 bar
+      - "\U0000f063"  # signal wifi bad
   - id: mdi_icons_25
     ## Lookup codes at https://pictogrammers.github.io/@mdi/font/7.4.47/
     file: "https://pictogrammers.github.io/@mdi/font/7.4.47/fonts/materialdesignicons-webfont.ttf"
     size: 25
     glyphs: &mdi_icons_glyphs
-      - "\U000F07D0" # home-assistant
-      #- "\U000F05A9" # wifi
-      #- "\U000F16B5" # wifi-alert
-      #- "\U000F051B" # timer-outline
-      #- "\U000F051E" # timer-off-outline
-      - "\U000F036C" # microphone
-      - "\U000F036D" # microphone-off
-      - "\U000F057E" # volume-high
-      - "\U000F0581" # volume-off
-      - "\U000F075D" # volume-plus
-      - "\U000F075E" # volume-minus
-      - "\U000F040A" # play
-      - "\U000F03E4" # pause
-      - "\U000F0432" # qrcode
-      - "\U000F0493" # cog
-      - "\U000F0B7B" # chat-processing
-      - "\U000F1876" # monitor-small
-      - "\U000F08D6" # cogs
-      - "\U000F02DC" # home
-      - "\U000F035E" # menu-left
-      - "\U000F035F" # menu-right
-      - "\U000F0954" # clock
-      - "\U000F0416" # plus-box
-      - "\U000F0375" # minus-box
-      - "\U000F04B2" # sleep
+      - "\U000F07D0"  # home-assistant
+      # - "\U000F05A9"  # wifi
+      # - "\U000F16B5"  # wifi-alert
+      # - "\U000F051B"  # timer-outline
+      # - "\U000F051E"  # timer-off-outline
+      - "\U000F036C"  # microphone
+      - "\U000F036D"  # microphone-off
+      - "\U000F057E"  # volume-high
+      - "\U000F0581"  # volume-off
+      - "\U000F075D"  # volume-plus
+      - "\U000F075E"  # volume-minus
+      - "\U000F040A"  # play
+      - "\U000F03E4"  # pause
+      - "\U000F0432"  # qrcode
+      - "\U000F0493"  # cog
+      - "\U000F0B7B"  # chat-processing
+      - "\U000F1876"  # monitor-small
+      - "\U000F08D6"  # cogs
+      - "\U000F02DC"  # home
+      - "\U000F035E"  # menu-left
+      - "\U000F035F"  # menu-right
+      - "\U000F0954"  # clock
+      - "\U000F0416"  # plus-box
+      - "\U000F0375"  # minus-box
+      - "\U000F04B2"  # sleep
   - id: mdi_icons_45
     file: "https://pictogrammers.github.io/@mdi/font/7.4.47/fonts/materialdesignicons-webfont.ttf"
     size: 45
@@ -805,45 +808,45 @@ color:
     hex: 'FF3131'
   - id: my_green
     hex: '75D15F'
-  #- id: my_blue_drk
+  # - id: my_blue_drk
   #  hex: '085296'
-  #- id: my_amber
+  # - id: my_amber
   #  hex: 'FBAB35'
-  #- id: my_lime
+  # - id: my_lime
   #  hex: '20FC30'
-  #- id: my_pink
+  # - id: my_pink
   #  hex: 'D92BBC'
-  #- id: my_yellow
+  # - id: my_yellow
   #  hex: 'FFC000'
-  #- id: my_purple
+  # - id: my_purple
   #  hex: '73264D'
-  #- id: my_light_blue
+  # - id: my_light_blue
   #  hex: 'CFE2F3'
-  #- id: my_bg_blue
+  # - id: my_bg_blue
   #  hex: '032341'
-  #- id: my_bg_purple
+  # - id: my_bg_purple
   #  hex: '301020'
-  #- id: my_bg_green
+  # - id: my_bg_green
   #  hex: '05350B'
-  #- id: my_bg_red
+  # - id: my_bg_red
   #  hex: '3C0000'
-  #- id: my_bg_pink
+  # - id: my_bg_pink
   #  hex: '61034D'
-  #- id: my_bg_charcoal
+  # - id: my_bg_charcoal
   #  hex: '323232'
-  #- id: my_bg_brown
+  # - id: my_bg_brown
   #  hex: '41220D'
-  #- id: my_bg_grey
+  # - id: my_bg_grey
   #  hex: '4F4F4F'
 
 globals:
   - id: wifi_connection
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: "false"
   - id: saved_speaker_volume
     type: float
-    restore_value: no
+    restore_value: false
     initial_value: '.5'
   # - id: global_first_active_timer
   #   type: voice_assistant::Timer
@@ -856,19 +859,19 @@ globals:
   #   restore_value: false
   # - id: global_is_timer
   #   type: bool
-  #   restore_value: false    
+  #   restore_value: false
 
 button:
   - id: restart_button
     platform: restart
     name: "Restart"
     entity_category: config
-    disabled_by_default : true
+    disabled_by_default: true
   - id: factory_reset_button
     platform: factory_reset
     name: "Factory Reset"
     entity_category: config
-    disabled_by_default : true
+    disabled_by_default: true
 
 light:
   - id: backlight_light
@@ -895,7 +898,7 @@ switch:
           then:
             - switch.template.publish:
                 id: mute_mic_switch
-                state: ON
+                state: true
     turn_off_action:
       - if:
           condition:
@@ -903,7 +906,7 @@ switch:
           then:
             - switch.template.publish:
                 id: mute_mic_switch
-                state: OFF
+                state: false
     on_turn_on:
       - voice_assistant.stop
       - micro_wake_word.stop
@@ -1242,7 +1245,7 @@ number:
           value: !lambda return x;
       - if:
           condition:
-              lvgl.page.is_showing: clock_page
+            lvgl.page.is_showing: clock_page
           then:
             - script.execute: set_idle_backlight_brightness
   - id: clock_delay_seconds
@@ -1320,21 +1323,21 @@ binary_sensor:
     filters:
       - invert:
     on_press:
-      #- script.execute:
+      # - script.execute:
       #    id: play_sound
       #    priority: false
       #    sound_file: !lambda return id(mute_switch_on_sound);
       - switch.template.publish:
           id: mute_mic_switch
-          state: ON
+          state: true
     on_release:
-      #- script.execute:
+      # - script.execute:
       #    id: play_sound
       #    priority: false
       #    sound_file: !lambda return id(mute_switch_off_sound);
       - switch.template.publish:
           id: mute_mic_switch
-          state: OFF
+          state: false
   ### top left hand physical button ###
   - id: top_left_button
     platform: gpio
@@ -1391,7 +1394,7 @@ lvgl:
         radius: 0
         text_align: CENTER
         text_color: my_blue
-        #text_font: my_font_22
+        # text_font: my_font_22
       - id: body_style
         align: TOP_MID
         width: 100%
@@ -1409,10 +1412,10 @@ lvgl:
         radius: 0
         text_align: CENTER
         text_color: my_blue
-        #text_font: my_font_22
+        # text_font: my_font_22
       - id: body_child_style
         width: 100%
-        #height: 100%
+        # height: 100%
         bg_color: BLACK
         border_opa: TRANSP
         border_width: 0
@@ -1424,7 +1427,7 @@ lvgl:
         radius: 0
         text_align: CENTER
         text_color: my_blue
-        #text_font: my_font_22
+        # text_font: my_font_22
       - id: settings_pages_body_style
         align: TOP_MID
         width: 100%
@@ -1442,7 +1445,7 @@ lvgl:
         radius: 0
         text_align: CENTER
         text_color: my_blue
-        #text_font: my_font_22
+        # text_font: my_font_22
       - id: settings_footer_style
         # TODO - figure out settings navigation if desired, if not remove this, might require new "body" style
         align: BOTTOM_MID
@@ -1457,7 +1460,7 @@ lvgl:
         radius: 0
         text_align: CENTER
         text_color: my_blue
-        #text_font: my_font_22
+        # text_font: my_font_22
       - id: fullscreen_style
         align: TOP_MID
         width: 100%
@@ -1475,7 +1478,7 @@ lvgl:
         radius: 0
         text_align: CENTER
         text_color: my_blue
-        #text_font: my_font_22
+        # text_font: my_font_22
       - id: header_popup_style
         align: TOP_MID
         width: 100%
@@ -1491,7 +1494,7 @@ lvgl:
         text_align: CENTER
         text_color: BLACK
         text_font: montserrat_14
-        #text_font: my_font_16
+        # text_font: my_font_16
       - id: footer_popup_style
         align: BOTTOM_MID
         width: 100%
@@ -1507,7 +1510,7 @@ lvgl:
         text_align: CENTER
         text_color: BLACK
         text_font: montserrat_14
-        #text_font: my_font_16
+        # text_font: my_font_16
       - id: center_popup_style
         align: CENTER
         width: 60%
@@ -1542,7 +1545,7 @@ lvgl:
         height: 30
         align: CENTER
         text_align: CENTER
-        #text_font: montserrat_18
+        # text_font: montserrat_18
       label:
         align: CENTER
         text_align: CENTER
@@ -1600,7 +1603,7 @@ lvgl:
                 - lvgl.widget.hide: factory_reset_msgbox
     top_layer:
       widgets:
-        - obj: # header_obj
+        - obj:  # header_obj
             id: header_obj
             styles: header_style
             layout:
@@ -1619,8 +1622,6 @@ lvgl:
                   on_press:
                     then:
                       - lambda: id(lvgl_change_page_script)->execute("api_info_page");
-                      # - lvgl.page.show: api_info_page
-                      # - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
               - button:
                   id: wifi_button
                   widgets:
@@ -1631,8 +1632,6 @@ lvgl:
                   on_press:
                     then:
                       - lambda: id(lvgl_change_page_script)->execute("wifi_info_page");
-                      # - lvgl.page.show: wifi_info_page
-                      # - lvgl.widget.hide: [header_popup_obj, footer_popup_obj, center_popup_obj, footer_navigation_btnmtrx]
               - button:
                   id: mic_mute_button
                   widgets:
@@ -1660,9 +1659,7 @@ lvgl:
                   on_press:
                     then:
                       - lambda: id(lvgl_change_page_script)->execute("settings_page");
-                      # - lvgl.page.show: settings_page
-                      # - lvgl.widget.show: footer_navigation_btnmtrx
-        - obj: # header_popup_obj
+        - obj:  # header_popup_obj
             id: header_popup_obj
             styles: header_popup_style
             hidden: true
@@ -1670,7 +1667,7 @@ lvgl:
               - label:
                   id: header_popup_label
                   text: "..."
-        - obj: # footer_popup_obj
+        - obj:  # footer_popup_obj
             id: footer_popup_obj
             styles: footer_popup_style
             hidden: true
@@ -1678,7 +1675,7 @@ lvgl:
               - label:
                   id: footer_popup_label
                   text: "..."
-        - obj: # center_popup_obj
+        - obj:  # center_popup_obj
             id: center_popup_obj
             styles: center_popup_style
             hidden: true
@@ -1686,30 +1683,7 @@ lvgl:
               - label:
                   id: center_popup_label
                   text: "0"
-        - buttonmatrix: # footer_navigation_btnmtrx
-            # TODO - consider top_layer buttonmatrix https://esphome.io/cookbook/lvgl.html#page-navigation-footer
-            id: footer_navigation_btnmtrx
-            styles: settings_footer_style
-            hidden: true
-            items:
-              bg_color: WHITE
-              text_color: BLACK
-              text_font: mdi_icons_25
-            rows:
-              - buttons:
-                  - text: "\U000F035E"
-                    on_press:
-                      then:
-                        - lvgl.page.previous:
-                  - text: "\U000F02DC"
-                    on_press:
-                      then:
-                        - lambda: id(lvgl_change_page_script)->execute("home_page");
-                  - text: "\U000F035F"
-                    on_press:
-                      then:
-                        - lvgl.page.next:
-        - keyboard: # lvgl_keyboard
+        - keyboard:  # lvgl_keyboard
             id: lvgl_keyboard
             hidden: true
             on_ready:
@@ -1719,7 +1693,7 @@ lvgl:
               then:
                 - lvgl.widget.hide: lvgl_keyboard
         # TODO Move to Pages section and adjust on_boot routine
-        - obj: # boot_screen_obj
+        - obj:  # boot_screen_obj
             id: boot_screen_obj
             styles: fullscreen_style
             widgets:
@@ -1851,7 +1825,7 @@ lvgl:
                 - label:
                     id: clock_page_date_label
                     text_color: WHITE
-                    #text_font: montserrat_18
+                    # text_font: montserrat_18
                 - label:
                     id: clock_page_time_label
                     text_color: WHITE
@@ -1872,7 +1846,7 @@ lvgl:
                     text: "UPDATING FIRMWARE"
                     text_color: my_red
                     text_font: montserrat_24
-                    #text_font: my_font_28
+                    # text_font: my_font_28
                 - bar:
                     id: ota_page_progress_bar
                     text_color: my_red
@@ -1924,7 +1898,7 @@ lvgl:
               widgets:
                 - tabview:
                     styles: body_child_style
-                    #height: 175
+                    # height: 175
                     position: LEFT
                     size: 30
                     tab_style:
@@ -1933,11 +1907,11 @@ lvgl:
                       text_font: mdi_icons_25
                       items:
                         styles: body_child_style
-                        #height: 175
+                        # height: 175
                         border_opa: COVER
                         border_width: 1
                     tabs:
-                      - id: device_settings_tab # Device Settings
+                      - id: device_settings_tab  # Device Settings
                         name: "\U000F08D6"
                         widgets:
                           - obj:
@@ -1945,7 +1919,7 @@ lvgl:
                               layout:
                                 type: FLEX
                                 flex_flow: COLUMN
-                                flex_align_main: CENTER #START
+                                flex_align_main: CENTER  # START
                                 flex_align_cross: CENTER
                                 flex_align_track: CENTER
                               widgets:
@@ -1957,7 +1931,7 @@ lvgl:
                                     id: brightness_percent_slider
                                     min_value: 20
                                     max_value: 100
-                                    #value: !lambda return id(brightness_percent).state;
+                                    # value: !lambda return id(brightness_percent).state;
                                     on_change:
                                       - lvgl.label.update:
                                           id: brightness_label
@@ -1975,7 +1949,7 @@ lvgl:
                                     layout:
                                       type: FLEX
                                       flex_flow: ROW
-                                      flex_align_main: SPACE_BETWEEN #CENTER
+                                      flex_align_main: SPACE_BETWEEN  # CENTER
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
@@ -2002,7 +1976,7 @@ lvgl:
                                       flex_align_cross: CENTER
                                       flex_align_track: CENTER
                                     widgets:
-                                      - button: # Restart
+                                      - button:  # Restart
                                           width: 75
                                           height: 30
                                           border_opa: COVER
@@ -2014,7 +1988,7 @@ lvgl:
                                           on_press:
                                             then:
                                               - lvgl.widget.show: restart_msgbox
-                                      - button: # Factory Reset
+                                      - button:  # Factory Reset
                                           width: 130
                                           height: 30
                                           border_opa: COVER
@@ -2026,7 +2000,7 @@ lvgl:
                                           on_press:
                                             then:
                                               - lvgl.widget.show: factory_reset_msgbox
-                      - id: off_settings_tab # Off Settings
+                      - id: off_settings_tab  # Off Settings
                         name: "\U000F04B2"
                         widgets:
                           - obj:
@@ -2106,7 +2080,7 @@ lvgl:
                                                 id: off_delay_seconds
                                                 value: !lambda return atoi(text.c_str());
                                             - lambda: id(update_header_popup_script)->execute("");
-                      - id: clock_settings_tab # Clock Settings
+                      - id: clock_settings_tab  # Clock Settings
                         name: "\U000F0954"
                         widgets:
                           - obj:
@@ -2194,7 +2168,7 @@ lvgl:
                                     id: clock_brightness_percent_slider
                                     min_value: 20
                                     max_value: 100
-                                    #value: !lambda return id(clock_brightness_percent).state;
+                                    # value: !lambda return id(clock_brightness_percent).state;
                                     on_change:
                                       - lvgl.label.update:
                                           id: clock_brightness_label
@@ -2205,7 +2179,7 @@ lvgl:
                                       - number.set:
                                           id: clock_brightness_percent
                                           value: !lambda return int(x);
-                      - id: assist_settings_tab # Assist Settings
+                      - id: assist_settings_tab  # Assist Settings
                         name: "\U000F0B7B"
                         widgets:
                           - obj:
@@ -2359,15 +2333,15 @@ lvgl:
       - timeout: !lambda "return (id(clock_delay_seconds).state * 1000);"
         then:
           - if:
-              condition: 
-                switch.is_on: clock_enabled_switch 
+              condition:
+                switch.is_on: clock_enabled_switch
               then:
                 - lambda: id(lvgl_change_page_script)->execute("clock_page");
       - timeout: !lambda "return (id(off_delay_seconds).state * 1000);"
         then:
           - if:
               condition:
-                - switch.is_on: off_enabled_switch            
+                - switch.is_on: off_enabled_switch
               then:
                 - lvgl.pause:
     on_pause:
@@ -2375,4 +2349,4 @@ lvgl:
     on_resume:
       - script.execute: set_default_backlight_brightness
       - lvgl.widget.redraw:
-  ### config end ###
+### config end ###

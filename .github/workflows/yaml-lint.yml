@@ -1,6 +1,7 @@
+---
 name: YAML lint
 
-on:
+on:  # yamllint disable-line
   push:
     branches: [main]
     paths:

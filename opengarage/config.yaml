@@ -1,5 +1,8 @@
+# yamllint disable rule:line-length
+
 ## Based on https://github.com/gabe565/esphome-configs/tree/main/opengarage
 ##
+---
 substitutions:
   # For Home Assistant entity_id, hostname, etc.
   device_name: opengarage
@@ -28,7 +31,7 @@ substitutions:
   # Height at which the door is considered open.
   # Should be slightly larger than the distance from the ceiling to the door.
   # Must be lower than the car threshold.
-  # Entered in cm. 
+  # Entered in cm.
   door_threshold: '50'
 
   # Height at which the car is considered to be home.
@@ -103,7 +106,7 @@ ota:
     password: !secret ota_password
 
 wifi:
-  #use_address: ${wifi_use_address}
+  # use_address: ${wifi_use_address}
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   domain: !secret wifi_domain
@@ -198,7 +201,7 @@ script:
                     rtttl: ${open_alarm_rtttl}
                 - wait_until:
                     not: rtttl.is_playing
-                - delay: 5s # TODO Turn into setting
+                - delay: 5s  # TODO Turn into setting
           - switch.turn_on: relay
           - cover.template.publish:
               id: opengarage_cover
@@ -221,7 +224,7 @@ script:
                     rtttl: ${close_alarm_rtttl}
                 - wait_until:
                     not: rtttl.is_playing
-                - delay: 5s # TODO Turn into setting
+                - delay: 5s  # TODO Turn into setting
           - switch.turn_on: relay
           - cover.template.publish:
               id: opengarage_cover
