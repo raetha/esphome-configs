@@ -52,7 +52,7 @@ substitutions:
   nov: November
   dec: December
 
-  boot_screen_image_url: https://github.com/BigBobbas/ESP32-S3-Box3-Custom-ESPHome/raw/main/images/loading.png
+  boot_screen_image_url: https://github.com/BigBobbas/ESP32-S3-Box3-Custom-ESPHome/raw/main/images/loading_lvgl.png
   # boot_screen_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
   listening_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/listening_320_240.png
   thinking_image_url: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/thinking_320_240.png
@@ -1767,6 +1767,8 @@ lvgl:
               - image:
                   src: boot_screen_image
               - spinner:
+                  align: BOTTOM_MID
+                  y: -20
                   spin_time: 1s
                   arc_length: 60deg
                   arc_width: 8
